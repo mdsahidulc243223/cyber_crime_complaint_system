@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 String          @id @default(uuid()) @db.Uuid
+  email              String          @unique @db.VarChar(255)
+  passwordHash       String          @db.VarChar(255)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  role               UserRole        @default(VICTIM)
+  name               String          @db.VarChar(100)
+  phone              String          @db.VarChar(20)
+  assignedComplaints Complaint[]     @relation("OfficerComplaints")
+  victimComplaints   Complaint[]     @relation("VictimComplaints")
+  investigations     Investigation[]
+  notifications      Notification[]
+}
+
+model ComplaintType {
+  id         String      @id @default(uuid()) @db.Uuid
+  typeName   String      @unique @db.VarChar(50)
+  typeCode   String      @db.VarChar(30)
+  lawSection String?     @db.VarChar(50)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  complaints Complaint[]
+}
+
+model PriorityLevel {
+  id                String      @id @default(uuid()) @db.Uuid
+  priorityName      String      @unique @db.VarChar(20)
+  responseTimeHours Int
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  complaints        Complaint[]
+}
+
+model Complaint {
+  id                String          @id @default(uuid()) @db.Uuid
+  complaintNumber   String          @unique @db.VarChar(30)
+  title             String          @db.VarChar(255)
+  description       String
+  incidentDate      DateTime
+  amountLost        Float?
+  status            ComplaintStatus @default(PENDING)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  victimId          String          @db.Uuid
+  assignedOfficerId String?         @db.Uuid
+  complaintTypeId   String          @db.Uuid
+  priorityId        String          @db.Uuid
+  assignedOfficer   User?           @relation("OfficerComplaints", fields: [assignedOfficerId], references: [id])
+  complaintType     ComplaintType   @relation(fields: [complaintTypeId], references: [id], onDelete: Cascade)
+  priority          PriorityLevel   @relation(fields: [priorityId], references: [id], onDelete: Cascade)
+  victim            User            @relation("VictimComplaints", fields: [victimId], references: [id], onDelete: Cascade)
+  evidences         Evidence[]
+  investigation     Investigation?
+  notifications     Notification[]
+  resolution        Resolution?
+  suspectDetail     SuspectDetail?
+}
+
+model EvidenceType {
+  id            String     @id @default(uuid()) @db.Uuid
+  typeName      String     @unique @db.VarChar(30)
+  maxFileSizeMB Int        @default(5)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  evidences     Evidence[]
+}
+
+model Evidence {
+  id             String       @id @default(uuid()) @db.Uuid
+  filePath       String       @db.VarChar(500)
+  hashValue      String?      @db.VarChar(255)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  complaintId    String       @db.Uuid
+  evidenceTypeId String       @db.Uuid
+  complaint      Complaint    @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  evidenceType   EvidenceType @relation(fields: [evidenceTypeId], references: [id], onDelete: Cascade)
+}
+
+model SuspectDetail {
+  id               String    @id @default(uuid()) @db.Uuid
+  suspectName      String?   @db.VarChar(100)
+  suspectPhone     String?   @db.VarChar(20)
+  suspectEmail     String?   @db.VarChar(255)
+  suspectBkash     String?   @db.VarChar(20)
+  suspectNagad     String?   @db.VarChar(20)
+  suspectIPAddress String?   @db.VarChar(50)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  complaintId      String    @unique @db.Uuid
+  complaint        Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+}
+
+model Investigation {
+  id                 String    @id @default(uuid()) @db.Uuid
+  findings           String?
+  technicalAnalysis  String?
+  progressPercentage Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  complaintId        String    @unique @db.Uuid
+  officerId          String    @db.Uuid
+  complaint          Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  officer            User      @relation(fields: [officerId], references: [id], onDelete: Cascade)
+}
+
+model Resolution {
+  id                String         @id @default(uuid()) @db.Uuid
+  resolutionType    ResolutionType
+  resolutionDetails String?
+  amountRecovered   Float          @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  complaintId       String         @unique @db.Uuid
+  complaint         Complaint      @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  type        NotificationType
+  subject     String?          @db.VarChar(255)
+  message     String
+  isSent      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  userId      String           @db.Uuid
+  complaintId String           @db.Uuid
+  complaint   Complaint        @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  VICTIM
+  OFFICER
+  ADMIN
+}
+
+enum ComplaintStatus {
+  PENDING
+  ASSIGNED
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum ResolutionType {
+  MONEY_RECOVERED
+  PARTIAL_RECOVERY
+  ARREST_MADE
+  CASE_CLOSED
+}
